@@ -1,0 +1,24 @@
+<script src="assets/js/Charts/includes/jquery.js"></script>
+<script src="assets/js/sensorCharts/src/dependencies/regl.js"></script>
+<script src="assets/js/sensorCharts/src/dependencies/line2d.js"></script>
+<script src="assets/js/sensorCharts/src/sensorchart.js"></script>
+<script src="assets/js/Charts/chartGen.js"></script>
+<div class="app-main__inner">
+    <div class="col-md-12 row">
+        <div class="col-md-3 form-group">
+            <label for="exampleSelect" class="">Select</label><select name="select" id="exampleSelect"
+                class="form-control">
+                {{range .VHs}}<option>{{ . }}</option>{{else}}<option class="zero"><strong>No available VHs</strong>
+                </option>{{end}}
+
+            </select></div>
+        <div class="col-md-9 player">
+            <button class="mb-2 mr-2 btn btn-primary" data-toggle="modal" data-target="#exampleModal"><i
+                    class="fas fa-plus"></i> <b>Add</b> </button>
+            <button id="open" class="mb-2 mr-2 btn btn-primary"><i class="fas fa-plus"></i> <b>Open</b> </button>
+
+        </div>
+    </div>
+
+</div>
+<script src="assets/js/Charts/core.js"></script>
