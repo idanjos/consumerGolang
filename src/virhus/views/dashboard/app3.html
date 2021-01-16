@@ -1,0 +1,17 @@
+<script src="assets/js/Charts/initChart.js"></script>
+<script src="assets/js/Charts/includes/vue.min.js"></script>
+<script src="assets/js/Charts/includes/apexcharts"></script>
+<script src="assets/js/Charts/includes/vue-apexcharts"></script>
+<script src="assets/js/Charts/chartGen.js"></script>
+<div class="app-main__inner">
+    <div class="row charts">
+        <div class="col-md-12">
+            <div class="mb-3 card">
+             Number of Messages:{{.TotalMsgs}}<br>Total Bandwidth:{{.TotalBand}}KBs
+             {{range .MSGs}}<span>{{ . }}</span>{{else}}<span class="zero"><strong>No available msgs found</strong>
+             </span>{{end}}
+            </div>
+        </div>
+    </div>
+</div>
+<script src="assets/js/Charts/vueChart.js"></script>

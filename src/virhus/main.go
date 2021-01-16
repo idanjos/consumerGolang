@@ -2,15 +2,20 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gorilla/sessions"
 	"github.com/gorilla/websocket"
+	_ "github.com/lib/pq"
+	"github.com/streadway/amqp"
 )
 
 var (
@@ -19,7 +24,13 @@ var (
 	store = sessions.NewCookieStore(key)
 )
 
-const pwd string = "/home/minty/Documents/Projects/PI_2.0/"
+const (
+	// TODO fill this in directly or through environment variable
+	// Build a DSN e.g. postgres://username:password@url.com:5432/dbName
+	DB_DSN = "postgres://postgres:admin@localhost:5432/postgres?sslmode=disable"
+)
+
+const pwd string = "/home/minty/Documents/TCIC/consumerGolang/"
 
 var views = pwd + "src/virhus/views/"
 var assets = pwd + "src/virhus/assets/"
@@ -31,6 +42,9 @@ var test = template.Must(template.ParseFiles(views + "test.html"))
 var homeTemplate = template.Must(template.ParseFiles(views + "echo.html"))
 var chart = template.Must(template.ParseFiles(views + "dashboard/templates/wrapper.html"))
 var dashboard = template.Must(template.ParseFiles(views + "dashboard/source/dashboard.html"))
+var iot = template.Must(template.ParseFiles(views + "dashboard/source/dashboard.html"))
+
+// var device = template.Must(template.ParseFiles(views + "dashboard/source/wrapper.html"))
 
 //Main function
 func main() {
@@ -38,53 +52,27 @@ func main() {
 	if port == "" {
 		port = "3003"
 	}
-	load()
-	loadData()
-	mux := http.NewServeMux()
 
-	fs := http.FileServer(http.Dir(assets))
-	mux.Handle("/assets/", http.StripPrefix("/assets/", fs))
-
-	mux.HandleFunc("/", indexHandler)
-	mux.HandleFunc("/home", home)
-	mux.HandleFunc("/echo", echo)
-	mux.HandleFunc("/test", testing)
-	mux.HandleFunc("/secret", secret)
-	mux.HandleFunc("/login", login)
-	mux.HandleFunc("/logout", logout)
-	mux.HandleFunc("/app", app)
-	mux.HandleFunc("/overview", overview)
-
-	mux.HandleFunc("/getData", getData)
-	mux.HandleFunc("/getVHs", getVirtualHumans)
-	mux.HandleFunc("/getVH", getVirtualHuman)
-	mux.HandleFunc("/createVH", createVH)
-	mux.HandleFunc("/getRecordings", getRecordings)
-	mux.HandleFunc("/downloadRecord", downloadRecord)
-	http.ListenAndServe(":"+port, mux)
-}
-
-// Websocket handler/server
-func echo(w http.ResponseWriter, r *http.Request) {
-	c, err := upgrader.Upgrade(w, r, nil)
+	db, err := sql.Open("postgres", DB_DSN)
 	if err != nil {
-		log.Print("upgrade:", err)
-		return
+		log.Fatal("Failed to open a DB connection: ", err)
 	}
-	defer c.Close()
-	for {
-		mt, message, err := c.ReadMessage()
-		if err != nil {
-			log.Println("read:", err)
-			break
-		}
-		log.Printf("recv: %s", message)
-		err = c.WriteMessage(mt, message)
-		if err != nil {
-			log.Println("write:", err)
-			break
-		}
-	}
+	defer db.Close()
+	go rabbbitConsumer()
+	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	failOnError(err, "Failed to connect to RabbitMQ")
+	defer conn.Close()
+
+	r := http.NewServeMux()
+
+	r.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(assets))))
+	r.Handle("/iot/assets/", http.StripPrefix("/iot/assets/", http.FileServer(http.Dir(assets))))
+
+	r.HandleFunc("/", route)
+
+	r.HandleFunc("/iot", route)
+	r.HandleFunc("/iot/", route)
+	http.ListenAndServe(":"+port, r)
 }
 
 //Route Response, endpoint responses
@@ -125,52 +113,6 @@ func logout(w http.ResponseWriter, r *http.Request) {
 	session.Save(r, w)
 }
 
-func home(w http.ResponseWriter, r *http.Request) {
-	homeTemplate.Execute(w, "ws://"+r.Host+"/echo")
-}
-
-func testing(w http.ResponseWriter, r *http.Request) {
-	data := struct {
-		Title string
-		Items []string
-	}{
-		Title: "My page",
-		Items: []string{},
-	}
-	test.Execute(w, data)
-}
-
-func app(w http.ResponseWriter, r *http.Request) {
-	//dat, err := ioutil.ReadFile(views + "dashboard/app2.html")
-	//check(err)
-	//get username
-	user := "root"
-	var options []string = []string{}
-	for _, val := range VirtualHumans[user] {
-		options = append(options, val.Name)
-	}
-	vhs := struct {
-		VHs []string
-	}{
-		VHs: options,
-	}
-	dat := template.Must(template.ParseFiles(views + "dashboard/app2.html"))
-	var tpl bytes.Buffer
-	if err := dat.Execute(&tpl, vhs); err != nil {
-		log.Fatalln(err)
-		return
-	}
-	data := struct {
-		App template.HTML
-	}{
-		App: template.HTML(tpl.String()),
-	}
-
-	//fmt.Println(data)
-	chart.Execute(w, data)
-	//chart.Execute(w, nil)
-}
-
 func overview(w http.ResponseWriter, r *http.Request) {
 	dashboard.Execute(w, nil)
 }
@@ -197,4 +139,172 @@ func internalError(w http.ResponseWriter) {
 func ok(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte{1})
+}
+
+func iotPage(w http.ResponseWriter, r *http.Request) {
+	db, err := sql.Open("postgres", DB_DSN)
+	if err != nil {
+		log.Fatal("Failed to open a DB connection: ", err)
+	}
+	defer db.Close()
+	stats := struct {
+		TotalMsgs int
+		TotalBand int
+		NDevices  int
+	}{
+		TotalMsgs: 0,
+		TotalBand: 0,
+		NDevices:  0,
+	}
+	sql := "select count(data_id) as totalMsgs,sum(size) as totalBand, COUNT ( DISTINCT device_id ) as nDevices from data_register dr;"
+	err = db.QueryRow(sql).Scan(&stats.TotalMsgs, &stats.TotalBand, &stats.NDevices)
+	if err != nil {
+		log.Fatal("Failed to execute query: ", err)
+	}
+	log.Println(stats)
+	dat := template.Must(template.ParseFiles(views + "dashboard/app.html"))
+	var tpl bytes.Buffer
+	if err := dat.Execute(&tpl, stats); err != nil {
+		log.Fatalln(err)
+		return
+	}
+
+	data := struct {
+		App template.HTML
+	}{
+		App: template.HTML(tpl.String()),
+	}
+
+	// iot.Execute(w, nil)
+	chart.Execute(w, data)
+}
+
+func devicePage(w http.ResponseWriter, r *http.Request) {
+	vars := strings.Split(r.URL.Path, "/")
+	device := vars[2]
+
+	db, err := sql.Open("postgres", DB_DSN)
+	if err != nil {
+		log.Fatal("Failed to open a DB connection: ", err)
+	}
+	defer db.Close()
+	var options []string = []string{}
+	rows, err := db.Query("select raw from data_register dr  where device_id  = $1", device)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			log.Fatal(err)
+		}
+		options = append(options, raw)
+	}
+	stats := struct {
+		TotalMsgs int
+		TotalBand int
+		MSGs      []string
+	}{
+		TotalMsgs: 0,
+		TotalBand: 0,
+		MSGs:      options,
+	}
+	sql := "select count(data_id) as totalMsgs,sum(size) as totalBand from data_register dr where device_id = $1;"
+	err = db.QueryRow(sql, device).Scan(&stats.TotalMsgs, &stats.TotalBand)
+	if err != nil {
+		log.Fatal("Failed to execute query: ", err)
+	}
+
+	dat := template.Must(template.ParseFiles(views + "dashboard/app3.html"))
+	var tpl bytes.Buffer
+	if err := dat.Execute(&tpl, stats); err != nil {
+		log.Fatalln(err)
+		return
+	}
+
+	data := struct {
+		App template.HTML
+	}{
+		App: template.HTML(tpl.String()),
+	}
+
+	// iot.Execute(w, nil)
+	chart.Execute(w, data)
+}
+
+var rNum = regexp.MustCompile(`/iot/[0-9]+`) // Has digit(s)
+var rAbc = regexp.MustCompile(`/iot`)        // Contains "abc"
+func route(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.URL.Path)
+	switch {
+	case rNum.MatchString(r.URL.Path):
+		devicePage(w, r)
+	case rAbc.MatchString(r.URL.Path):
+		iotPage(w, r)
+	default:
+		indexHandler(w, r)
+	}
+}
+func failOnError(err error, msg string) {
+	if err != nil {
+		log.Fatalf("%s: %s", msg, err)
+	}
+}
+
+func rabbbitConsumer() {
+	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	failOnError(err, "Failed to connect to RabbitMQ")
+	defer conn.Close()
+
+	db, err := sql.Open("postgres", DB_DSN)
+	if err != nil {
+		log.Fatal("Failed to open a DB connection: ", err)
+	}
+	defer db.Close()
+
+	ch, err := conn.Channel()
+	failOnError(err, "Failed to open a channel")
+	defer ch.Close()
+
+	q, err := ch.QueueDeclare(
+		"hello", // name
+		false,   // durable
+		false,   // delete when unused
+		false,   // exclusive
+		false,   // no-wait
+		nil,     // arguments
+	)
+	failOnError(err, "Failed to declare a queue")
+
+	msgs, err := ch.Consume(
+		q.Name, // queue
+		"",     // consumer
+		true,   // auto-ack
+		false,  // exclusive
+		false,  // no-local
+		false,  // no-wait
+		nil,    // args
+	)
+	failOnError(err, "Failed to register a consumer")
+
+	forever := make(chan bool)
+
+	go func() {
+		sqlStatement := `
+insert into public.data_register (device_id ,size ,raw )
+VALUES ($1, $2, $3)`
+
+		for d := range msgs {
+			_, err = db.Exec(sqlStatement, 2, 50, d.Body)
+			if err != nil {
+				panic(err)
+			}
+
+			log.Printf("Received a message: %s", d.Body)
+		}
+	}()
+
+	log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
+	<-forever
 }
