@@ -188,8 +188,15 @@ func devicePage(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("Failed to open a DB connection: ", err)
 	}
 	defer db.Close()
+	var macAddr string
+	sql2 := "select macAddr from device_table dr where device_id = $1;"
+	err = db.QueryRow(sql2, device).Scan(&macAddr)
+	if err != nil {
+		log.Fatal("Failed to execute query: ", err)
+	}
+
 	var options []string = []string{}
-	rows, err := db.Query("select raw from data_register dr  where device_id  = $1", device)
+	rows, err := db.Query("select raw from data_register dr  where macAddr  = $1", macAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -292,12 +299,17 @@ func rabbbitConsumer() {
 
 	go func() {
 		sqlStatement := `
-insert into public.data_register (device_id ,size ,raw )
-VALUES ($1, $2, $3)`
+insert into public.data_register (device_id,macAddr ,size ,raw )
+VALUES ($1, $2, $3, $4)`
 
 		for d := range msgs {
-			_, err = db.Exec(sqlStatement, 2, 50, d.Body)
+			data := strings.Split(string(d.Body), "mac ")
+			if len(data) < 2 {
+				continue
+			}
+			_, err = db.Exec(sqlStatement, 2, data[1], 50, d.Body)
 			if err != nil {
+				log.Println(err)
 				panic(err)
 			}
 
