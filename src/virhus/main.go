@@ -31,7 +31,7 @@ const (
 )
 
 //var pwd string = "/home/minty/Documents/TCIC/consumerGolang/"
-var pwd, err = os.Getwd()
+var pwd = os.Args[1]
 var views = pwd + "/views/"
 var assets = pwd + "/assets/"
 var upgrader = websocket.Upgrader{}
