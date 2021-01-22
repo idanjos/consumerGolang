@@ -30,10 +30,10 @@ const (
 	DB_DSN = "postgres://postgres:admin@localhost:5432/postgres?sslmode=disable"
 )
 
-const pwd string = "/home/minty/Documents/TCIC/consumerGolang/"
-
-var views = pwd + "src/virhus/views/"
-var assets = pwd + "src/virhus/assets/"
+//var pwd string = "/home/minty/Documents/TCIC/consumerGolang/"
+var pwd, err = os.Getwd()
+var views = pwd + "/views/"
+var assets = pwd + "/assets/"
 var upgrader = websocket.Upgrader{}
 
 var sensor = template.Must(template.ParseFiles(views + "sensorCharts/index.html"))
@@ -48,6 +48,7 @@ var iot = template.Must(template.ParseFiles(views + "dashboard/source/dashboard.
 
 //Main function
 func main() {
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3003"
