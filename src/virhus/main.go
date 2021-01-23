@@ -35,7 +35,7 @@ var pwd = os.Args[1]
 var views = pwd + "/views/"
 var assets = pwd + "/assets/"
 var upgrader = websocket.Upgrader{}
-var vps = "85.217.171.67"
+var vps = os.Args[2]
 var sensor = template.Must(template.ParseFiles(views + "sensorCharts/index.html"))
 var tpl = template.Must(template.ParseFiles(views + "index.html"))
 var test = template.Must(template.ParseFiles(views + "test.html"))
@@ -261,7 +261,7 @@ func failOnError(err error, msg string) {
 }
 
 func rabbbitConsumer() {
-	conn, err := amqp.Dial("amqp://guest:guest@85.217.171.67:5672/")
+	conn, err := amqp.Dial("amqp://guest:guest@" + vps + ":5672/")
 	failOnError(err, "Failed to connect to RabbitMQ")
 	defer conn.Close()
 

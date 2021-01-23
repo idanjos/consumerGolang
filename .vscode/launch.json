@@ -10,7 +10,7 @@
             "request": "launch",
             "mode": "debug",
             "program": "/home/minty/Documents/TCIC/consumerGolang/src/virhus",
-            "args": ["/home/minty/Documents/TCIC/consumerGolang/src/virhus"]
+            "args": ["/home/minty/Documents/TCIC/consumerGolang/src/virhus","localhost"]
         },
 
         {
