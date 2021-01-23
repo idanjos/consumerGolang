@@ -28,11 +28,9 @@ var (
 var pwd = os.Args[1]
 var vps = os.Args[2]
 
-const (
-	// TODO fill this in directly or through environment variable
-	// Build a DSN e.g. postgres://username:password@url.com:5432/dbName
-	DB_DSN = "postgres://postgres:admin@" + vps + ":5432/postgres?sslmode=disable"
-)
+// TODO fill this in directly or through environment variable
+// Build a DSN e.g. postgres://username:password@url.com:5432/dbName
+var DB_DSN = "postgres://postgres:admin@" + vps + ":5432/postgres?sslmode=disable"
 
 var views = pwd + "/views/"
 var assets = pwd + "/assets/"
