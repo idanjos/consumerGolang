@@ -24,18 +24,20 @@ var (
 	store = sessions.NewCookieStore(key)
 )
 
+//var pwd string = "/home/minty/Documents/TCIC/consumerGolang/"
+var pwd = os.Args[1]
+var vps = os.Args[2]
+
 const (
 	// TODO fill this in directly or through environment variable
 	// Build a DSN e.g. postgres://username:password@url.com:5432/dbName
-	DB_DSN = "postgres://postgres:admin@localhost:5432/postgres?sslmode=disable"
+	DB_DSN = "postgres://postgres:admin@" + vps + ":5432/postgres?sslmode=disable"
 )
 
-//var pwd string = "/home/minty/Documents/TCIC/consumerGolang/"
-var pwd = os.Args[1]
 var views = pwd + "/views/"
 var assets = pwd + "/assets/"
 var upgrader = websocket.Upgrader{}
-var vps = os.Args[2]
+
 var sensor = template.Must(template.ParseFiles(views + "sensorCharts/index.html"))
 var tpl = template.Must(template.ParseFiles(views + "index.html"))
 var test = template.Must(template.ParseFiles(views + "test.html"))
@@ -60,7 +62,7 @@ func main() {
 	}
 	defer db.Close()
 	go rabbbitConsumer()
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	conn, err := amqp.Dial("amqp://guest:guest@" + vps + ":5672/")
 	failOnError(err, "Failed to connect to RabbitMQ")
 	defer conn.Close()
 
