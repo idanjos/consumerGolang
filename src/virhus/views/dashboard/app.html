@@ -7,10 +7,91 @@
     <div class="row charts">
 
         <div class="col-md-12">
-            <div class="mb-3 card">
-                Number of Devices:{{.NDevices}}<br> Number of Messages:{{.TotalMsgs}}<br>Total Bandwidth:{{.TotalBand}}KBs
+            <div class="row">
+            <div class="col-md-4 col-xl-4">
+                <div class="card mb-3 widget-content bg-midnight-bloom">
+                    <div class="widget-content-wrapper text-white">
+                        <div class="widget-content-left">
+                            <div class="widget-heading">Devices</div>
+                            <div class="widget-subheading">Number of Devices</div>
+                        </div>
+                        <div class="widget-content-right">
+                            <div class="widget-numbers text-white"><span>{{.NDevices}}</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-xl-4">
+                <div class="card mb-3 widget-content bg-arielle-smile">
+                    <div class="widget-content-wrapper text-white">
+                        <div class="widget-content-left">
+                            <div class="widget-heading">Messages</div>
+                            <div class="widget-subheading">Number of Messages</div>
+                        </div>
+                        <div class="widget-content-right">
+                            <div class="widget-numbers text-white"><span>{{.TotalMsgs}}</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-xl-4">
+                <div class="card mb-3 widget-content bg-grow-early">
+                    <div class="widget-content-wrapper text-white">
+                        <div class="widget-content-left">
+                            <div class="widget-heading">Bandwidth</div>
+                            <div class="widget-subheading">Total</div>
+                        </div>
+                        <div class="widget-content-right">
+                            <div class="widget-numbers text-white"><span>{{.TotalBand}}KBs</span></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
+        <div class="row">
+            <div class="col-md-12">
+            <div class="main-card mb-12 card">
+                <div class="card-header">Devices
+                    <div class="btn-actions-pane-right">
+                        <div role="group" class="btn-group-sm btn-group">
+                            <button class="btn btn-focus">Current</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="align-middle mb-0 table table-borderless table-striped table-hover">
+                        <thead>
+                        <tr>
+                            <th class="text-center">#</th>
+                            <th>Device Name</th>
+                            <th class="text-center">Mac Address</th>
+                            <th class="text-center">BLE Version</th>
+                            <th class="text-center">View</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {{range .Devices}}    
+                        <tr>
+                            <td class="text-center text-muted">{{.Id}}</td>
+                            <td class="text-center text-muted">{{.Name}}</td>
+                            <td class="text-center">{{.Mac}}</td>
+                            <td class="text-center">
+                                <div class="badge badge-primary">{{.BLE}}</div>
+                            </td>
+                            <td class="text-center">
+                                <a href="/iot/{{.Id}}" id="PopoverCustomT-1" class="btn btn-primary btn-sm">Preview</a>
+                            </td>
+                        </tr>
+                        {{end}}
+                        
+                        </tbody>
+                    </table>
+                </div>
+                
+            </div>
+        </div>
+    </div>    
+    </div>
     </div>
 </div>
 <script src="assets/js/Charts/vueChart.js"></script>

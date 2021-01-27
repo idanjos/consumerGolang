@@ -3,15 +3,101 @@
 <script src="assets/js/Charts/includes/apexcharts"></script>
 <script src="assets/js/Charts/includes/vue-apexcharts"></script>
 <script src="assets/js/Charts/chartGen.js"></script>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+      google.charts.load('current', {'packages':['corechart']});
+      google.charts.setOnLoadCallback(drawChart);
+
+      function drawChart() {
+        var raw = [{{range .MSGs}}{{ . }}, {{end}}];
+        //console.log(raw)
+        var info = [['i', 'Intensity' ,'Steps', 'HeartRate']]
+        for (let index = 0; index < 30; index++) {
+            //console.log(raw[index].split(";"))
+            intensity = raw[index].split(";")[1].split(" ")[2];
+            steps = raw[index].split(";")[2].split(" ")[2];
+            heartrate = raw[index].split(";")[3].split(" ")[3];
+
+            info.push([index,parseInt(intensity),parseInt(steps),parseInt(heartrate)])
+        }
+        var data = google.visualization.arrayToDataTable(info);
+        //console.log(info)
+        var options = {
+          title: '{{.Dev.Mac}}',
+          curveType: 'function',
+          legend: { position: 'bottom' }
+        };
+        
+        var chart = new google.visualization.LineChart(document.getElementById('curve_chart'));
+
+        chart.draw(data, options);
+      }
+    </script>
+
 <div class="app-main__inner">
     <div class="row charts">
-        <div class="col-md-12">
-            <div class="mb-3 card">
-             Number of Messages:{{.TotalMsgs}}<br>Total Bandwidth:{{.TotalBand}}KBs
-             {{range .MSGs}}<span>{{ . }}</span>{{else}}<span class="zero"><strong>No available msgs found</strong>
-             </span>{{end}}
+        <div class="col-md-4 col-xl-4">
+            <div class="card mb-3 widget-content bg-midnight-bloom">
+                <div class="widget-content-wrapper text-white">
+                    <div class="widget-content-left">
+                        <div class="widget-heading">{{.Dev.Mac}}</div>
+                        <div class="widget-subheading">{{.Dev.BLE}}</div>
+                    </div>
+                    <div class="widget-content-right">
+                        <div class="widget-numbers text-white"><span>{{.Dev.Name}}</span></div>
+                    </div>
+                </div>
             </div>
         </div>
+        <div class="col-md-4 col-xl-4">
+            <div class="card mb-3 widget-content bg-arielle-smile">
+                <div class="widget-content-wrapper text-white">
+                    <div class="widget-content-left">
+                        <div class="widget-heading">Messages</div>
+                        <div class="widget-subheading">Number of Messages</div>
+                    </div>
+                    <div class="widget-content-right">
+                        <div class="widget-numbers text-white"><span>{{.TotalMsgs}}</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-xl-4">
+            <div class="card mb-3 widget-content bg-grow-early">
+                <div class="widget-content-wrapper text-white">
+                    <div class="widget-content-left">
+                        <div class="widget-heading">Bandwidth</div>
+                        <div class="widget-subheading">Total</div>
+                    </div>
+                    <div class="widget-content-right">
+                        <div class="widget-numbers text-white"><span>{{.TotalBand}}KBs</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12">
+            <div class="mb-3 card">
+                <div class="card-header-tab card-header">
+                    <div class="card-header-title">
+                        <i class="header-icon lnr-rocket icon-gradient bg-tempting-azure"> </i>
+                        Incoming Data
+                    </div>
+                    
+                </div>
+                <div class="tab-content">
+                    <div class="tab-pane fade active show" id="tab-eg-55">
+                        <div class="widget-chart p-3">
+                            <div style="height: 350px">
+                                <div id="curve_chart" style="width: 100%; height: 100%"></div>
+
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+        
     </div>
 </div>
 <script src="assets/js/Charts/vueChart.js"></script>

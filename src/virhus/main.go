@@ -44,6 +44,13 @@ var chart = template.Must(template.ParseFiles(views + "dashboard/templates/wrapp
 var dashboard = template.Must(template.ParseFiles(views + "dashboard/source/dashboard.html"))
 var iot = template.Must(template.ParseFiles(views + "dashboard/source/dashboard.html"))
 
+type Device struct {
+	Id   int
+	Name string
+	Mac  string
+	BLE  string
+}
+
 // var device = template.Must(template.ParseFiles(views + "dashboard/source/wrapper.html"))
 
 //Main function
@@ -152,11 +159,28 @@ func iotPage(w http.ResponseWriter, r *http.Request) {
 		TotalMsgs int
 		TotalBand int
 		NDevices  int
+		Devices   []Device
 	}{
 		TotalMsgs: 0,
 		TotalBand: 0,
 		NDevices:  0,
+		Devices:   []Device{},
 	}
+
+	var dds []Device = []Device{}
+	rows, err := db.Query("select device_id ,device_name, macaddr , ble_version from device_table dt ;")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var raw Device
+		if err := rows.Scan(&raw.Id, &raw.Name, &raw.Mac, &raw.BLE); err != nil {
+			log.Fatal(err)
+		}
+		dds = append(dds, raw)
+	}
+	stats.Devices = dds
 	sql := "select count(data_id) as totalMsgs,sum(size) as totalBand, COUNT ( DISTINCT device_id ) as nDevices from data_register dr;"
 	err = db.QueryRow(sql).Scan(&stats.TotalMsgs, &stats.TotalBand, &stats.NDevices)
 	if err != nil {
@@ -189,15 +213,17 @@ func devicePage(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("Failed to open a DB connection: ", err)
 	}
 	defer db.Close()
-	var macAddr string
-	sql2 := "select macAddr from device_table dr where device_id = $1;"
-	err = db.QueryRow(sql2, device).Scan(&macAddr)
+	var d Device
+	sql2 := "select device_id ,device_name, macaddr , ble_version from device_table dr where device_id = $1;"
+	err = db.QueryRow(sql2, device).Scan(&d.Id, &d.Name, &d.Mac, &d.BLE)
 	if err != nil {
 		log.Fatal("Failed to execute query: ", err)
+		iotPage(w, r)
+		return
 	}
 
 	var options []string = []string{}
-	rows, err := db.Query("select raw from data_register dr  where macAddr  = $1", macAddr)
+	rows, err := db.Query("select raw from data_register dr  where macAddr  = $1", d.Mac)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -213,10 +239,12 @@ func devicePage(w http.ResponseWriter, r *http.Request) {
 		TotalMsgs int
 		TotalBand int
 		MSGs      []string
+		Dev       Device
 	}{
 		TotalMsgs: 0,
 		TotalBand: 0,
 		MSGs:      options,
+		Dev:       d,
 	}
 	sql := "select count(data_id) as totalMsgs,sum(size) as totalBand from data_register dr where device_id = $1;"
 	err = db.QueryRow(sql, device).Scan(&stats.TotalMsgs, &stats.TotalBand)
@@ -241,6 +269,8 @@ func devicePage(w http.ResponseWriter, r *http.Request) {
 	chart.Execute(w, data)
 }
 
+var rpre = regexp.MustCompile(`/preview`)
+var rindex = regexp.MustCompile(`/`)
 var rNum = regexp.MustCompile(`/iot/[0-9]+`) // Has digit(s)
 var rAbc = regexp.MustCompile(`/iot`)        // Contains "abc"
 func route(w http.ResponseWriter, r *http.Request) {
@@ -250,6 +280,10 @@ func route(w http.ResponseWriter, r *http.Request) {
 		devicePage(w, r)
 	case rAbc.MatchString(r.URL.Path):
 		iotPage(w, r)
+	case rpre.MatchString(r.URL.Path):
+		overview(w, r)
+	case rindex.MatchString(r.URL.Path):
+		indexHandler(w, r)
 	default:
 		indexHandler(w, r)
 	}
